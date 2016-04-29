@@ -104,7 +104,6 @@ void simAdd(string x, string y) {
 
     // allocate blank symbol display at ends of tapes
     int len = max(x.size(), y.size()) + 1;
-    string res(len, ' ');
     string xs(len - x.size(), ' ');
     string ys(len - y.size(), ' ');
     x += xs, y += ys;
@@ -124,7 +123,7 @@ void simAdd(string x, string y) {
 
         cout << "TRANSITION\n";
         // old state, read
-        cout << "State " << curState << ", (" << xc << "," << yc << ", ) ==> ";
+        cout << "State " << curState << ", (" << xc << "," << yc << ") ==> ";
 
         if (xc == ' ' && yc == ' ') {
             y[tapePos] = curState ? '1' : ' ';
@@ -139,8 +138,7 @@ void simAdd(string x, string y) {
         }
 
         // new state, write
-        cout << "State " << curState << ", (" << xc << "," << yc << ","
-                << y[tapePos] << "), R\n";
+        cout << "State " << curState << ", (" << xc << "," << yc << "), R\n";
 
         tapePos++;
         // print tape
@@ -157,13 +155,12 @@ void simAdd(string x, string y) {
 }
 
 void simSub(string x, string y) {
-    int tapePos = 0; // common tape position in this algorithm
-    int curState = 0; // represents carry status
+    int tapePos = 0; // common tape position
+    int curState = 0; // carry status
     int finalState = 2;
 
     // allocate blank symbol display at ends of tapes
     int len = max(x.size(), y.size()) + 1;
-    string res(len, ' ');
     string xs(len - x.size(), ' ');
     string ys(len - y.size(), ' ');
     x += xs, y += ys;
@@ -175,7 +172,6 @@ void simSub(string x, string y) {
     printTape(x, tapePos);
     cout << "Tape 2: ";
     printTape(y, tapePos);
-    cout << "Tape 3: [ ]\n\n";
 
     while (curState != finalState) {
         // transition function
@@ -184,23 +180,22 @@ void simSub(string x, string y) {
 
         cout << "TRANSITION\n";
         // old state, read
-        cout << "State " << curState << ", (" << xc << "," << yc << ", ) ==> ";
+        cout << "State " << curState << ", (" << xc << "," << yc << ") ==> ";
 
         if (xc == ' ' && yc == ' ') {
-            res[tapePos] = ' ';
+            y[tapePos] = ' ';
             curState = finalState;
         } else {
             int b1 = (xc == ' ') ? 0 : (xc - '0');
             int b2 = (yc == ' ') ? 0 : (yc - '0');
             int b3 = (b1 - b2 - curState) & 1;
-            res[tapePos] = b3 + '0';
+            y[tapePos] = b3 + '0';
 
             curState = (b1 - b2 - curState < 0);
         }
 
         // new state, write
-        cout << "State " << curState << ", (" << xc << "," << yc << ","
-                << res[tapePos] << "), R\n";
+        cout << "State " << curState << ", (" << xc << "," << yc << "), R\n";
 
         tapePos++;
         // print tape
@@ -208,15 +203,12 @@ void simSub(string x, string y) {
         printTape(x, tapePos);
         cout << "Tape 2: ";
         printTape(y, tapePos);
-        cout << "Tape 3: ";
-        printTape(res, tapePos);
         cout << "\n";
     }
 
     cout << "RESULT\n";
-    cout << "Tape: " << res << "\n";
-    cout << "Result: " << binToDec(res) << "\n";
-    cout << "Not yet implemented.\n";
+    cout << "Tape: " << y << "\n";
+    cout << "Result: " << binToDec(y) << "\n";
 }
 
 void simMult(string x, string y) {
