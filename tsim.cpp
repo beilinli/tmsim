@@ -11,6 +11,9 @@ void simSub(string, string);
 void simMult(string, string);
 void simExp(string, string);
 
+#define MODE_PLUS 1
+#define MODE_MINUS 0
+
 const char *usgMsg = "Usage: ./tsim [-add|-sub|-mult|-exp] [x] [y]";
 
 /*
@@ -95,9 +98,12 @@ string itos(int n) {
 }
 
 /*
- * simAdd - simulates addition on a 3-tape TM and prints trace
+ * simPlus - inner computation for simAdd, simSub
+ *
+ * Param:
+ *  mode: 1 for addition, 0 for subtraction
  */
-void simAdd(string x, string y) {
+void simPlus(string x, string y, int mode) {
     int tapePos = 0; // common tape position
     int curState = 0; // carry status
     int finalState = 2;
@@ -126,15 +132,17 @@ void simAdd(string x, string y) {
         cout << "State " << curState << ", (" << xc << "," << yc << ") ==> ";
 
         if (xc == ' ' && yc == ' ') {
-            y[tapePos] = curState ? '1' : ' ';
+            y[tapePos] = (mode * curState) ? '1' : ' ';
             curState = finalState;
         } else {
             int b1 = (xc == ' ') ? 0 : (xc - '0');
             int b2 = (yc == ' ') ? 0 : (yc - '0');
-            int b3 = (curState + b1 + b2) & 1;
+            int sum = mode ? (curState + b1 + b2) : (b2 + curState - b1);
+
+            int b3 = sum & 1;
             y[tapePos] = b3 + '0';
 
-            curState = (curState + b1 + b2 > 1);
+            curState = (sum > mode);
         }
 
         // new state, write
@@ -154,61 +162,12 @@ void simAdd(string x, string y) {
     cout << "Result: " << binToDec(y) << "\n";
 }
 
+void simAdd(string x, string y) {
+    simPlus(x, y, MODE_PLUS);
+}
+
 void simSub(string x, string y) {
-    int tapePos = 0; // common tape position
-    int curState = 0; // carry status
-    int finalState = 2;
-
-    // allocate blank symbol display at ends of tapes
-    int len = max(x.size(), y.size()) + 1;
-    string xs(len - x.size(), ' ');
-    string ys(len - y.size(), ' ');
-    x += xs, y += ys;
-
-    // print initial configuration (state, marked tapes)
-    cout << "INITIAL CONFIGURATION\n";
-    cout << "state 0\n";
-    cout << "Tape 1: ";
-    printTape(x, tapePos);
-    cout << "Tape 2: ";
-    printTape(y, tapePos);
-
-    while (curState != finalState) {
-        // transition function
-        char xc = x[tapePos];
-        char yc = y[tapePos];
-
-        cout << "TRANSITION\n";
-        // old state, read
-        cout << "State " << curState << ", (" << xc << "," << yc << ") ==> ";
-
-        if (xc == ' ' && yc == ' ') {
-            y[tapePos] = ' ';
-            curState = finalState;
-        } else {
-            int b1 = (xc == ' ') ? 0 : (xc - '0');
-            int b2 = (yc == ' ') ? 0 : (yc - '0');
-            int b3 = (b1 - b2 - curState) & 1;
-            y[tapePos] = b3 + '0';
-
-            curState = (b1 - b2 - curState < 0);
-        }
-
-        // new state, write
-        cout << "State " << curState << ", (" << xc << "," << yc << "), R\n";
-
-        tapePos++;
-        // print tape
-        cout << "Tape 1: ";
-        printTape(x, tapePos);
-        cout << "Tape 2: ";
-        printTape(y, tapePos);
-        cout << "\n";
-    }
-
-    cout << "RESULT\n";
-    cout << "Tape: " << y << "\n";
-    cout << "Result: " << binToDec(y) << "\n";
+    simPlus(x, y, MODE_MINUS);
 }
 
 void simMult(string x, string y) {
