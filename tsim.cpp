@@ -223,7 +223,65 @@ void simSub(string x, string y) {
 }
 
 void simMult(string x, string y) {
-    cout << "Not yet implemented.\n";
+    int tapePos[] = {0, 0, 0};
+    int curState = 0;
+    int finalState = 5;
+
+    // allocate blank symbol display at ends of tapes
+    int len = max(x.size(), y.size()) + 1;
+    string res(len, ' ');
+    string xs(len - x.size(), ' ');
+    string ys(len - y.size(), ' ');
+    x += xs, y += ys;
+
+    // print initial configuration (state, marked tapes)
+    cout << "INITIAL CONFIGURATION\n";
+    cout << "state 0\n";
+    cout << "Tape 1: ";
+    printTape(x, tapePos[0]);
+    cout << "Tape 2: ";
+    printTape(y, tapePos[1]);
+    cout << "Tape 3: [ ]\n\n";
+
+    while (curState != finalState) {
+        // transition function
+        char xc = x[tapePos[0]];
+        char yc = y[tapePos[1]];
+
+        cout << "TRANSITION\n";
+        // old state, read
+        cout << "State " << curState << ", (" << xc << "," << yc << ", ) ==> ";
+
+        if (xc == ' ' && yc == ' ') {
+            res[tapePos[2]] = curState ? '1' : ' ';
+            curState = finalState;
+        } else {
+            int b1 = (xc == ' ') ? 0 : (xc - '0');
+            int b2 = (yc == ' ') ? 0 : (yc - '0');
+            int b3 = (curState + b1 + b2) & 1;
+            res[tapePos[2]] = b3 + '0';
+
+            curState = (curState + b1 + b2 > 1);
+        }
+
+        // new state, write
+        cout << "State " << curState << ", (" << xc << "," << yc << ","
+                << res[tapePos[2]] << "), R\n";
+
+        tapePos[0]++, tapePos[1]++, tapePos[2]++;
+        // print tape
+        cout << "Tape 1: ";
+        printTape(x, tapePos[0]);
+        cout << "Tape 2: ";
+        printTape(y, tapePos[1]);
+        cout << "Tape 3: ";
+        printTape(res, tapePos[2]);
+        cout << "\n";
+    }
+
+    cout << "RESULT\n";
+    cout << "Tape: " << res << "\n";
+    cout << "Result: " << binToDec(res) << "\n";
 }
 
 void simExp(string x, string y) {
