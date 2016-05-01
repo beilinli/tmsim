@@ -17,8 +17,8 @@ void simExp(string, string);
 const char *usgMsg = "Usage: ./tsim [-add|-sub|-mult|-exp] [x] [y]";
 
 /*
- * main - main routine for the simulator
- * argv: desired operation and two nonnegative operands
+ * main - simulator main routine reads arguments and calls appropriate function.
+ * argv: desired operation and two nonnegative operands.
  */
 int main(int argc, char **argv) {
     if (argc != 4) {
@@ -62,6 +62,9 @@ string revBin(int n) {
     return res;
 }
 
+/*
+ * binToDec - returns integer whose reverse binary representation is bin.
+ */
 int binToDec(string bin) {
     int len = bin.size();
     int n = 0;
@@ -73,7 +76,8 @@ int binToDec(string bin) {
 }
 
 /*
- * printTape - prints contents of tape marked at tape position
+ * printTape - prints contents of tape marked at tape position.
+ * requires: 0 <= pos < tape.size()
  */
 void printTape(string tape, int pos) {
     int len = tape.size();
@@ -98,17 +102,22 @@ string itos(int n) {
 }
 
 /*
- * simPlus - inner computation for simAdd, simSub
+ * simPlus - inner computation for simAdd, simSub. Written to avoid
+ *  code duplication for addition/subtraction.
+ *
+ * Invariants for machine:
+ *  common tape position increments rightward until final
  *
  * Param:
+ *  x, y: operands
  *  mode: 1 for addition, 0 for subtraction
  */
 void simPlus(string x, string y, int mode) {
     int tapePos = 0; // common tape position
-    int curState = 0; // carry status
+    int curState = 0; // carry state for operation on current digits
     int finalState = 2;
 
-    // allocate blank symbol display at ends of tapes
+    // allocate blank symbol buffer at end of both tapes
     int len = max(x.size(), y.size()) + 1;
     string xs(len - x.size(), ' ');
     string ys(len - y.size(), ' ');
@@ -122,31 +131,41 @@ void simPlus(string x, string y, int mode) {
     cout << "Tape 2: ";
     printTape(y, tapePos);
 
+    /*
+     * Encode transition function.
+     * Current state is 0 if and only if no carry required to add
+     * current digits.
+     */
     while (curState != finalState) {
-        // transition function
-        char xc = x[tapePos];
-        char yc = y[tapePos];
-
         cout << "TRANSITION\n";
-        // old state, read
-        cout << "State " << curState << ", (" << xc << "," << yc << ") ==> ";
+        // print old state
+        cout << "State " << curState << ", (" << x[tapePos] << ","
+            << y[tapePos] << ") ==> ";
 
-        if (xc == ' ' && yc == ' ') {
+        if (x[tapePos] == ' ' && y[tapePos] == ' ') {
+            /*
+             * Subtraction: reached end of computation. See below for defn of
+             *  subtraction.
+             * Addition: new digit 0+0=0 if no carry, 0+0+1=1 if carry.
+             */
             y[tapePos] = (mode * curState) ? '1' : ' ';
             curState = finalState;
         } else {
-            int b1 = (xc == ' ') ? 0 : (xc - '0');
-            int b2 = (yc == ' ') ? 0 : (yc - '0');
-            int sum = mode ? (curState + b1 + b2) : (b2 + curState - b1);
+            // new digit is modulo 2 sum of old digits and carry status
+            int b1 = (x[tapePos] == ' ') ? 0 : (x[tapePos] - '0');
+            int b2 = (y[tapePos] == ' ') ? 0 : (y[tapePos] - '0');
 
-            int b3 = sum & 1;
+            // determine if carry with next digit
+            int digitSum = mode ? (curState + b1 + b2) : (b2 + curState - b1);
+            curState = (digitSum > mode);
+
+            int b3 = digitSum & 1;
             y[tapePos] = b3 + '0';
-
-            curState = (sum > mode);
         }
 
-        // new state, write
-        cout << "State " << curState << ", (" << xc << "," << yc << "), R\n";
+        // write new state configuration
+        cout << "State " << curState << ", (" << x[tapePos] << ","
+            << y[tapePos] << "), R\n";
 
         tapePos++;
         // print tape
@@ -157,30 +176,76 @@ void simPlus(string x, string y, int mode) {
         cout << "\n";
     }
 
+    // print final contents
     cout << "RESULT\n";
     cout << "Tape: " << y << "\n";
     cout << "Result: " << binToDec(y) << "\n";
 }
 
+/*
+ * simAdd - computes x + y.
+ *
+ * Param:
+ *  x, y: reverse binary representation of operands
+ *
+ * Requires:
+ *  x, y >= 0
+ */
 void simAdd(string x, string y) {
     simPlus(x, y, MODE_PLUS);
 }
 
+/*
+ * simSub - computes x - y if x > y;  (x - y) modulo 2^(|y|) otherwise.
+ *
+ * Param:
+ *  x, y: reverse binary representation of operands
+ *
+ * Requires: x, y >= 0
+ */
 void simSub(string x, string y) {
     simPlus(x, y, MODE_MINUS);
 }
 
+/*
+ * posChange - maps direction of tape shift to numerical position change.
+ * Used in simMult.
+ *
+ * Param:
+ *  dir - 'L', 'R', or 'S'
+ */
+int posChange(char dir) {
+    if (dir == 'L') return -1;
+    if (dir == 'R') return 1;
+    return 0;
+}
+
+/*
+ * simMult - computes x * y. Until x is the 0 string, TM decrements x, adds y
+ *  to tape to eventually store product. See documentation for details.
+ *
+ * Param:
+ *  x, y: reverse binary representation of operands
+ *
+ * Requires:
+ *  x, y >= 0 of reasonable length (e.g. representation of 64-bit integers)
+ *
+ * Invariants:
+ *  tape positions return to 0 after each step
+ *  tapes y, prod [see below] always at same position
+ */
 void simMult(string x, string y) {
-    int tapePos[] = {0, 0, 0};
+    int tapePos[] = {1, 1, 1};
     int curState = 0;
     int finalState = 5;
 
     // allocate blank symbol display at ends of tapes
-    int len = max(x.size(), y.size()) + 1;
-    string res(len, ' ');
+    int len = x.size() * y.size() + 2;
     string xs(len - x.size(), ' ');
     string ys(len - y.size(), ' ');
-    x += xs, y += ys;
+    x = " " + x + xs, y = " " + y + ys;
+
+    string prod(len, ' '); // tape storing value of x * y
 
     // print initial configuration (state, marked tapes)
     cout << "INITIAL CONFIGURATION\n";
@@ -189,47 +254,91 @@ void simMult(string x, string y) {
     printTape(x, tapePos[0]);
     cout << "Tape 2: ";
     printTape(y, tapePos[1]);
-    cout << "Tape 3: [ ]\n\n";
+    cout << "Tape 3: ";
+    printTape(prod, tapePos[2]);
 
+    /*
+     * Encode transition function.
+     * State key:
+     *  0 - decrement x
+     *  1 - move x tape position left to beginning
+     *  2, 3 - add y to prod [see below]. Identical to carry states in addition
+     *      algorithm.
+     *  4 - move y, prod tape positions left
+     *  5 - final
+     */
     while (curState != finalState) {
-        // transition function
-        char xc = x[tapePos[0]];
-        char yc = y[tapePos[1]];
+        char dir[3] = {'S', 'S', 'S'}; // direction of shift for each tape
 
         cout << "TRANSITION\n";
         // old state, read
-        cout << "State " << curState << ", (" << xc << "," << yc << ", ) ==> ";
+        cout << "State " << curState << ", (" << x[tapePos[0]] << ","
+            << y[tapePos[1]] << ", " << prod[tapePos[2]] << ") ==> ";
 
-        if (xc == ' ' && yc == ' ') {
-            res[tapePos[2]] = curState ? '1' : ' ';
-            curState = finalState;
-        } else {
-            int b1 = (xc == ' ') ? 0 : (xc - '0');
-            int b2 = (yc == ' ') ? 0 : (yc - '0');
-            int b3 = (curState + b1 + b2) & 1;
-            res[tapePos[2]] = b3 + '0';
+        if (curState == 0) {
+            if (x[tapePos[0]] == '0') {
+                x[tapePos[0]] = '1';
+                dir[0] = 'R';
+            } else if (x[tapePos[0]] == '1') {
+                x[tapePos[0]] = '0';
+                curState = 1;
+                dir[0] = 'L';
+            } else if (x[tapePos[0]] == ' ') {
+                curState = finalState;
+            }
+        } else if (curState == 1) {
+            if (x[tapePos[0]] == ' ') {
+                curState = 2;
+                dir[0] = 'R';
+            } else {
+                dir[0] = 'L';
+            }
+        } else if (curState == 2 || curState == 3) {
+            if (y[tapePos[1]] == ' ' && prod[tapePos[2]] == ' ') {
+                prod[tapePos[2]] = (curState == 3) ? '1' : ' ';
+                curState = 4;
+                dir[1] = dir[2] = 'L';
+            } else {
+                int b1 = (y[tapePos[1]] == ' ') ? 0 : (y[tapePos[1]] - '0');
+                int b2 = (prod[tapePos[2]] == ' ') ? 0 : (prod[tapePos[2]] - '0');
 
-            curState = (curState + b1 + b2 > 1);
+                // determine if carry with next digit
+                int digitSum = (curState - 2) + b1 + b2;
+                curState = (digitSum > 1) + 2;
+                prod[tapePos[2]] = (digitSum & 1) + '0';
+
+                dir[1] = dir[2] = 'R';
+            }
+        } else if (curState == 4) {
+            if (y[tapePos[1]] == ' ' && prod[tapePos[2]] == ' ') {
+                curState = 0;
+                dir[1] = dir[2] = 'R';
+            } else {
+                dir[1] = dir[2] = 'L';
+            }
         }
 
-        // new state, write
-        cout << "State " << curState << ", (" << xc << "," << yc << ","
-                << res[tapePos[2]] << "), R\n";
+        // write new configuration
+        cout << "State " << curState << ", (" << x[tapePos[0]] << ","
+                << y[tapePos[1]] << "," << prod[tapePos[2]] << "), ("
+                << dir[0] <<", " << dir[1] << ", " << dir[2] << ")\n";
 
-        tapePos[0]++, tapePos[1]++, tapePos[2]++;
-        // print tape
+        // calculate print new tape
+        for (int i = 0; i < 3; i++)
+            tapePos[i] += posChange(dir[i]);
+
         cout << "Tape 1: ";
         printTape(x, tapePos[0]);
         cout << "Tape 2: ";
         printTape(y, tapePos[1]);
         cout << "Tape 3: ";
-        printTape(res, tapePos[2]);
+        printTape(prod, tapePos[2]);
         cout << "\n";
     }
 
     cout << "RESULT\n";
-    cout << "Tape: " << res << "\n";
-    cout << "Result: " << binToDec(res) << "\n";
+    cout << "Tape: " << prod << "\n";
+    cout << "Result: " << binToDec(prod) << "\n";
 }
 
 void simExp(string x, string y) {
