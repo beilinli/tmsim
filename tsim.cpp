@@ -276,7 +276,9 @@ void simMult(string x, string y) {
             << y[tapePos[1]] << ", " << prod[tapePos[2]] << ") ==> ";
 
         if (curState == 0) {
-            if (x[tapePos[0]] == '0') {
+            if (prod[tapePos[2]] == ' ') {
+                prod[tapePos[2]] = '0';
+            } else if (x[tapePos[0]] == '0') {
                 x[tapePos[0]] = '1';
                 dir[0] = 'R';
             } else if (x[tapePos[0]] == '1') {
