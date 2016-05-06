@@ -222,7 +222,7 @@ int posChange(char dir) {
 
 /*
  * simMult - computes x * y. Until x is the 0 string, TM decrements x, adds y
- *  to tape to eventually store product. See documentation for details.
+ *  to tape storing eventual product, using same algorithm as simPLus.
  *
  * Param:
  *  x, y: reverse binary representation of operands
@@ -236,16 +236,33 @@ int posChange(char dir) {
  */
 void simMult(string x, string y) {
     int tapePos[] = {1, 1, 1};
-    int curState = 0;
-    int finalState = 5;
 
-    // allocate blank symbol display at ends of tapes
+    /*
+     * State key:
+     *
+     * DEC_X - decrement x if positive
+     * DEC_X_BACK - backtrack after DEC_X
+     * ADD_NO_CARRY - same as in above addition algorithm
+     * ADD_CARRY - same as in above addition algorithm
+     * ADD_BACK - backtrack after addition procedure
+     * FINAL_ST - final state
+     */
+
+    const int DEC_X = 0;
+    const int DEC_X_BACK = 1;
+    const int ADD_NO_CARRY = 2;
+    const int ADD_CARRY = 3;
+    const int ADD_BACK = 4;
+    const int FINAL_ST = 5;
+    int curState = DEC_X;
+
+    // allocate enough blank symbols to store potential tape content
     int len = x.size() * y.size() + 2;
     string xs(len - x.size(), ' ');
     string ys(len - y.size(), ' ');
     x = " " + x + xs, y = " " + y + ys;
 
-    string prod(len, ' '); // tape storing value of x * y
+    string prod(len, ' '); // tape stores value of x * y
 
     // print initial configuration (state, marked tapes)
     cout << "INITIAL CONFIGURATION\n";
@@ -257,25 +274,16 @@ void simMult(string x, string y) {
     cout << "Tape 3: ";
     printTape(prod, tapePos[2]);
 
-    /*
-     * Encode transition function.
-     * State key:
-     *  0 - decrement x
-     *  1 - move x tape position left to beginning
-     *  2, 3 - add y to prod [see below]. Identical to carry states in addition
-     *      algorithm.
-     *  4 - move y, prod tape positions left
-     *  5 - final
-     */
-    while (curState != finalState) {
+    // Encode transition function.
+    while (curState != FINAL_ST) {
         char dir[3] = {'S', 'S', 'S'}; // direction of shift for each tape
 
         cout << "TRANSITION\n";
         // old state, read
         cout << "State " << curState << ", (" << x[tapePos[0]] << ","
-            << y[tapePos[1]] << ", " << prod[tapePos[2]] << ") ==> ";
+            << y[tapePos[1]] << "," << prod[tapePos[2]] << ") ==> ";
 
-        if (curState == 0) {
+        if (curState == DEC_X) {
             if (prod[tapePos[2]] == ' ') {
                 prod[tapePos[2]] = '0';
             } else if (x[tapePos[0]] == '0') {
@@ -283,37 +291,37 @@ void simMult(string x, string y) {
                 dir[0] = 'R';
             } else if (x[tapePos[0]] == '1') {
                 x[tapePos[0]] = '0';
-                curState = 1;
+                curState = DEC_X_BACK;
                 dir[0] = 'L';
             } else if (x[tapePos[0]] == ' ') {
-                curState = finalState;
+                curState = FINAL_ST;
             }
         } else if (curState == 1) {
             if (x[tapePos[0]] == ' ') {
-                curState = 2;
+                curState = ADD_NO_CARRY;
                 dir[0] = 'R';
             } else {
                 dir[0] = 'L';
             }
-        } else if (curState == 2 || curState == 3) {
+        } else if (curState == ADD_NO_CARRY || curState == ADD_CARRY) {
             if (y[tapePos[1]] == ' ' && prod[tapePos[2]] == ' ') {
-                prod[tapePos[2]] = (curState == 3) ? '1' : ' ';
-                curState = 4;
+                prod[tapePos[2]] = (curState == ADD_CARRY) ? '1' : ' ';
+                curState = ADD_BACK;
                 dir[1] = dir[2] = 'L';
             } else {
                 int b1 = (y[tapePos[1]] == ' ') ? 0 : (y[tapePos[1]] - '0');
                 int b2 = (prod[tapePos[2]] == ' ') ? 0 : (prod[tapePos[2]] - '0');
 
                 // determine if carry with next digit
-                int digitSum = (curState - 2) + b1 + b2;
-                curState = (digitSum > 1) + 2;
+                int digitSum = (curState - ADD_NO_CARRY) + b1 + b2;
+                curState = (digitSum > 1) + ADD_NO_CARRY;
                 prod[tapePos[2]] = (digitSum & 1) + '0';
 
                 dir[1] = dir[2] = 'R';
             }
-        } else if (curState == 4) {
+        } else if (curState == ADD_BACK) {
             if (y[tapePos[1]] == ' ' && prod[tapePos[2]] == ' ') {
-                curState = 0;
+                curState = DEC_X;
                 dir[1] = dir[2] = 'R';
             } else {
                 dir[1] = dir[2] = 'L';
@@ -344,7 +352,8 @@ void simMult(string x, string y) {
 }
 
 /*
- * simExp - computes x^y. TODO
+ * simExp - computes x^y. The 4-tape TM decrements y, using the algorithm for
+ *  simMult to multiply a running total by the base, x, on each iteration.
  *
  * Param:
  *  x, y: reverse binary representation of operands
@@ -354,12 +363,34 @@ void simMult(string x, string y) {
  *  where at least one is nonzero.
  *
  * Invariants:
- *  TODO
+ *  see below.
  */
 void simExp(string x, string y) {
+    /*
+     * Tape key:
+     *  Tape 1 - base input (x)
+     *  Tape 2 - exponent input (y)
+     *  Tape 3 - stores copy of running result to be used in multiplication
+     *  Tape 4 - stores running result x^i for 0 <= i <= y
+     */
     int tapePos[] = {1, 1, 1, 1};
 
-    // state key
+    /*
+     * State key (see individual state code for more details):
+     *  CHECK_ZERO - return 0 if base is 0.
+     *  CHECK_ZERO_BACK - backtrack after CHECK_ZERO
+     *  DEC_EXP - decrement exponent if positive
+     *  DEC_EXP_BACK - backtrack after DEC_EXP
+     *  COPY_RES - store copy of current result
+     *  COPY_RES_BACK - backtrack after COPY_RES
+     *  DEC_RES_COPY -
+     *  DEC_RES_COPY_BACK -
+     *  END_RES_COPY_BACK
+     *  ADD_NO_CARRY
+     *  ADD_CARRY
+     *  ADD_BACK - backtrack after addition
+     *  FINAL_ST - final state
+     */
     const int CHECK_ZERO = 0;
     const int CHECK_ZERO_BACK = 1;
     const int DEC_EXP = 2;
