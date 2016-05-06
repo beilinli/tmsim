@@ -221,8 +221,8 @@ int posChange(char dir) {
 }
 
 /*
- * simMult - computes x * y. Until x is the 0 string, TM decrements x, adds y
- *  to tape storing eventual product, using same algorithm as simPLus.
+ * simMult - computes x * y. The 3-tape TM repeatedly adds y to a running total,
+ * decrementing x to mark an iteration.
  *
  * Param:
  *  x, y: reverse binary representation of operands
@@ -284,6 +284,10 @@ void simMult(string x, string y) {
             << y[tapePos[1]] << "," << prod[tapePos[2]] << ") ==> ";
 
         if (curState == DEC_X) {
+            /*
+             * Consider a string of multiple 0s to be valued 0.
+             * Otherwise, [0^n][1][s] => [1^n][0][s].
+             */
             if (prod[tapePos[2]] == ' ') {
                 prod[tapePos[2]] = '0';
             } else if (x[tapePos[0]] == '0') {
@@ -296,7 +300,8 @@ void simMult(string x, string y) {
             } else if (x[tapePos[0]] == ' ') {
                 curState = FINAL_ST;
             }
-        } else if (curState == 1) {
+        } else if (curState == DEC_X_BACK) {
+            // Move first tape position back to original position.
             if (x[tapePos[0]] == ' ') {
                 curState = ADD_NO_CARRY;
                 dir[0] = 'R';
@@ -304,6 +309,11 @@ void simMult(string x, string y) {
                 dir[0] = 'L';
             }
         } else if (curState == ADD_NO_CARRY || curState == ADD_CARRY) {
+            /*
+             * Add y to running total.
+             * Same addition algorithm as in simPlus.
+             * Invariant: tape positions of y and prod are always the same.
+             */
             if (y[tapePos[1]] == ' ' && prod[tapePos[2]] == ' ') {
                 prod[tapePos[2]] = (curState == ADD_CARRY) ? '1' : ' ';
                 curState = ADD_BACK;
@@ -320,6 +330,7 @@ void simMult(string x, string y) {
                 dir[1] = dir[2] = 'R';
             }
         } else if (curState == ADD_BACK) {
+            // Move y, prod tape positions back to original. Both are identical.
             if (y[tapePos[1]] == ' ' && prod[tapePos[2]] == ' ') {
                 curState = DEC_X;
                 dir[1] = dir[2] = 'R';
@@ -352,8 +363,9 @@ void simMult(string x, string y) {
 }
 
 /*
- * simExp - computes x^y. The 4-tape TM decrements y, using the algorithm for
- *  simMult to multiply a running total by the base, x, on each iteration.
+ * simExp - computes x^y. The 4-tape TM repeatedly multiplies a running total by
+ * x using the same algorithm as in simMult, starting from 1, decrementing y to
+ * mark an iteration.
  *
  * Param:
  *  x, y: reverse binary representation of operands
@@ -429,11 +441,7 @@ void simExp(string x, string y) {
     cout << "Tape 4: ";
     printTape(res, tapePos[3]);
 
-    /*
-     * Encode transition function.
-     * State key:
-     *  TODO
-     */
+    /* Encode transition function. */
     while (curState != FINAL_ST) {
         char dir[4] = {'S', 'S', 'S', 'S'}; // direction of shift for each tape
 
@@ -444,6 +452,7 @@ void simExp(string x, string y) {
             << "," << res[tapePos[3]] << ") ==> ";
 
         if (curState == CHECK_ZERO) {
+            // Return 0 if base is 0. Note 0^0 is undefined.
             if (x[tapePos[0]] == '0') {
                 dir[0] = 'R';
             } else if (x[tapePos[0]] == '1') {
@@ -454,6 +463,7 @@ void simExp(string x, string y) {
                 res[tapePos[3]] = '0';
             }
         } else if (curState == CHECK_ZERO_BACK) {
+            // Move top tape position back left to original after zero check.
             if (x[tapePos[0]] == ' ') {
                 curState = DEC_EXP;
                 res[tapePos[3]] = '1';
@@ -462,6 +472,7 @@ void simExp(string x, string y) {
                 dir[0] = 'L';
             }
         } else if (curState == DEC_EXP) {
+            // Decrement exponent to mark iteration. Nothing special here.
             if (y[tapePos[1]] == '0') {
                 y[tapePos[1]] = '1';
                 dir[1] = 'R';
@@ -473,6 +484,7 @@ void simExp(string x, string y) {
                 curState = FINAL_ST;
             }
         } else if (curState == DEC_EXP_BACK) {
+            // Move top tape position back to original after decrement procedure.
             if (y[tapePos[1]] == ' ') {
                 curState = COPY_RES;
                 dir[1] = 'R';
@@ -480,6 +492,11 @@ void simExp(string x, string y) {
                 dir[1] = 'L';
             }
         } else if (curState == COPY_RES) {
+            /*
+             * Store a copy of current power of x in the third tape, to be multiplied
+             * by base (x). Tape positions of result and copy stay the same throughout
+             * copy.
+             */
             if (resCopy[tapePos[2]] == ' ' && res[tapePos[3]] == ' ') {
                 curState = COPY_RES_BACK;
                 dir[2] = dir[3] = 'L';
@@ -492,6 +509,7 @@ void simExp(string x, string y) {
                 dir[2] = dir[3] = 'R';
             }
         } else if (curState == COPY_RES_BACK) {
+            // Move tape 2, 3 positions (identical) back after copy.
             if (resCopy[tapePos[2]] == ' ') {
                 curState = DEC_RES_COPY;
                 dir[2] = dir[3] = 'R';
@@ -499,6 +517,11 @@ void simExp(string x, string y) {
                 dir[2] = dir[3] = 'L';
             }
         } else if (curState == DEC_RES_COPY) {
+            /*
+             * Run same multiplication procedure as in simMult, using the copy
+             * of current power of x as first operand (decremented per iteration).
+             * Move tape position back after decrement.
+             */
             if (resCopy[tapePos[2]] == '0') {
                 resCopy[tapePos[2]] = '1';
                 dir[2] = 'R';
@@ -511,6 +534,7 @@ void simExp(string x, string y) {
                 dir[2] = 'L';
             }
         } else if (curState == DEC_RES_COPY_BACK) {
+            // Move resCopy tape position back to original after actual decrement.
             if (resCopy[tapePos[2]] == ' ') {
                 curState = ADD_NO_CARRY;
                 dir[2] = 'R';
@@ -518,6 +542,8 @@ void simExp(string x, string y) {
                 dir[2] = 'L';
             }
         } else if (curState == END_RES_COPY_BACK) {
+            // Move resCopy tape position back to original after determining 0.
+            // Note this is required to be able to run earlier procedures again.
             if (resCopy[tapePos[2]] == ' ') {
                 dir[2] = 'R';
                 curState = DEC_EXP;
@@ -525,7 +551,7 @@ void simExp(string x, string y) {
                 dir[2] = 'L';
             }
         } else if (curState == ADD_NO_CARRY || curState == ADD_CARRY) {
-        /*} else if (curState == 2 || curState == 3) { */
+            // same addition procedure as in simPlus
             if (x[tapePos[0]] == ' ' && res[tapePos[3]] == ' ') {
                 res[tapePos[3]] = (curState == ADD_CARRY) ? '1' : ' ';
                 curState = ADD_BACK;
