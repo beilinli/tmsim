@@ -343,6 +343,203 @@ void simMult(string x, string y) {
     cout << "Result: " << binToDec(prod) << "\n";
 }
 
+/*
+ * simExp - computes x^y. TODO
+ *
+ * Param:
+ *  x, y: reverse binary representation of operands
+ *
+ * Requires:
+ *  x, y >= 0 reasonable length (e.g. representation of 64-bit integers)
+ *  where at least one is nonzero.
+ *
+ * Invariants:
+ *  TODO
+ */
 void simExp(string x, string y) {
-    cout << "Not yet implemented.\n";
+    int tapePos[] = {1, 1, 1, 1};
+
+    // state key
+    const int CHECK_ZERO = 0;
+    const int CHECK_ZERO_BACK = 1;
+    const int DEC_EXP = 2;
+    const int DEC_EXP_BACK = 3;
+    const int COPY_RES = 4;
+    const int COPY_RES_BACK = 5;
+    const int DEC_RES_COPY = 6;
+    const int DEC_RES_COPY_BACK = 7;
+    const int END_RES_COPY_BACK = 8;
+    const int ADD_NO_CARRY = 9;
+    const int ADD_CARRY = 10;
+    const int ADD_BACK = 11;
+    const int FINAL_ST = 12;
+
+    int curState = CHECK_ZERO;
+
+    // allocate blank symbol display at ends of tapes
+    int len = (binToDec(x) + 1) * (y.size() + 1);
+    string xs(len - x.size(), ' ');
+    string ys(len - y.size(), ' ');
+    x = " " + x + xs, y = " " + y + ys;
+
+    string baseCopy(len, ' '), resCopy(len, ' '), res(len, ' ');
+    resCopy = " " + resCopy; // TODO
+    res = " " + res; // stores final result
+
+    // print initial configuration (state, marked tapes)
+    cout << "INITIAL CONFIGURATION\n";
+    cout << "state 0\n";
+    cout << "Tape 1: ";
+    printTape(x, tapePos[0]);
+    cout << "Tape 2: ";
+    printTape(y, tapePos[1]);
+    cout << "Tape 3: ";
+    printTape(resCopy, tapePos[2]);
+    cout << "Tape 4: ";
+    printTape(res, tapePos[3]);
+
+    /*
+     * Encode transition function.
+     * State key:
+     *  TODO
+     */
+    while (curState != FINAL_ST) {
+        char dir[4] = {'S', 'S', 'S', 'S'}; // direction of shift for each tape
+
+        cout << "TRANSITION\n";
+        // old state, read
+        cout << "State " << curState << ", (" << x[tapePos[0]] << ","
+            << y[tapePos[1]] << "," << resCopy[tapePos[2]]
+            << "," << res[tapePos[3]] << ") ==> ";
+
+        if (curState == CHECK_ZERO) {
+            if (x[tapePos[0]] == '0') {
+                dir[0] = 'R';
+            } else if (x[tapePos[0]] == '1') {
+                curState = CHECK_ZERO_BACK;
+                dir[0] = 'L';
+            } else {
+                curState = FINAL_ST;
+                res[tapePos[3]] = '0';
+            }
+        } else if (curState == CHECK_ZERO_BACK) {
+            if (x[tapePos[0]] == ' ') {
+                curState = DEC_EXP;
+                res[tapePos[3]] = '1';
+                dir[0] = 'R';
+            } else {
+                dir[0] = 'L';
+            }
+        } else if (curState == DEC_EXP) {
+            if (y[tapePos[1]] == '0') {
+                y[tapePos[1]] = '1';
+                dir[1] = 'R';
+            } else if (y[tapePos[1]] == '1') {
+                curState = DEC_EXP_BACK;
+                y[tapePos[1]] = '0';
+                dir[1] = 'L';
+            } else if (y[tapePos[1]] == ' ') {
+                curState = FINAL_ST;
+            }
+        } else if (curState == DEC_EXP_BACK) {
+            if (y[tapePos[1]] == ' ') {
+                curState = COPY_RES;
+                dir[1] = 'R';
+            } else {
+                dir[1] = 'L';
+            }
+        } else if (curState == COPY_RES) {
+            if (resCopy[tapePos[2]] == ' ' && res[tapePos[3]] == ' ') {
+                curState = COPY_RES_BACK;
+                dir[2] = dir[3] = 'L';
+            } else if (res[tapePos[3]] == ' ') {
+                resCopy[tapePos[2]] = '0';
+                dir[2] = dir[3] = 'R';
+            } else {
+                resCopy[tapePos[2]] = res[tapePos[3]];
+                res[tapePos[3]] = ' ';
+                dir[2] = dir[3] = 'R';
+            }
+        } else if (curState == COPY_RES_BACK) {
+            if (resCopy[tapePos[2]] == ' ') {
+                curState = DEC_RES_COPY;
+                dir[2] = dir[3] = 'R';
+            } else {
+                dir[2] = dir[3] = 'L';
+            }
+        } else if (curState == DEC_RES_COPY) {
+            if (resCopy[tapePos[2]] == '0') {
+                resCopy[tapePos[2]] = '1';
+                dir[2] = 'R';
+            } else if (resCopy[tapePos[2]] == '1') {
+                resCopy[tapePos[2]] = '0';
+                curState = DEC_RES_COPY_BACK;
+                dir[2] = 'L';
+            } else if (resCopy[tapePos[2]] == ' ') {
+                curState = END_RES_COPY_BACK;
+                dir[2] = 'L';
+            }
+        } else if (curState == DEC_RES_COPY_BACK) {
+            if (resCopy[tapePos[2]] == ' ') {
+                curState = ADD_NO_CARRY;
+                dir[2] = 'R';
+            } else {
+                dir[2] = 'L';
+            }
+        } else if (curState == END_RES_COPY_BACK) {
+            if (resCopy[tapePos[2]] == ' ') {
+                dir[2] = 'R';
+                curState = DEC_EXP;
+            } else {
+                dir[2] = 'L';
+            }
+        } else if (curState == ADD_NO_CARRY || curState == ADD_CARRY) {
+        /*} else if (curState == 2 || curState == 3) { */
+            if (x[tapePos[0]] == ' ' && res[tapePos[3]] == ' ') {
+                res[tapePos[3]] = (curState == ADD_CARRY) ? '1' : ' ';
+                curState = ADD_BACK;
+                dir[0] = dir[3] = 'L';
+            } else {
+                int b1 = (x[tapePos[0]] == ' ') ? 0 : (x[tapePos[0]] - '0');
+                int b2 = (res[tapePos[3]] == ' ') ? 0 : (res[tapePos[3]] - '0');
+
+                // determine if carry with next digit
+                int digitSum = (curState - ADD_NO_CARRY) + b1 + b2;
+                curState = (digitSum > 1) + ADD_NO_CARRY;
+                res[tapePos[3]] = (digitSum & 1) + '0';
+
+                dir[0] = dir[3] = 'R';
+            }
+        } else if (curState == ADD_BACK) {
+            if (x[tapePos[0]] == ' ' && res[tapePos[3]] == ' ') {
+                curState = DEC_RES_COPY;
+                dir[0] = dir[3] = 'R';
+            } else {
+                dir[0] = dir[3] = 'L';
+            }
+        }
+
+        // write new configuration
+        cout << "State " << curState << ", (" << x[tapePos[0]] << ","
+            << y[tapePos[1]] << "," << resCopy[tapePos[2]] << ","
+            << res[tapePos[3]] << "), (" << dir[0] << ", " << dir[1]
+            << ", " << dir[2] << ", " << dir[3] << ")\n";
+
+        // calculate print new tape
+        for (int i = 0; i < 4; i++)
+            tapePos[i] += posChange(dir[i]);
+
+        cout << "Tape 1: ";
+        printTape(x, tapePos[0]);
+        cout << "Tape 2: ";
+        printTape(y, tapePos[1]);
+        cout << "Tape 3: ";
+        printTape(resCopy, tapePos[2]);
+        cout << "Tape 4: ";
+        printTape(res, tapePos[3]);
+    }
+
+    cout << "RESULT\n";
+    cout << "Tape: " << res << "\n";
+    cout << "Result: " << binToDec(res) << "\n";
 }
